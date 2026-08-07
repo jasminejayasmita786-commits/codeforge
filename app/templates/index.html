@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="codeforge — a calm, no-clutter assistant that generates, debugs, or explains your code.">
+  <meta name="theme-color" content="#F4F5F2">
+  <title>codeforge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body data-mode="{{ mode }}">
+
+  <main class="stage">
+
+    <header class="masthead">
+      <div class="mark">
+        <span class="mark__glyph" aria-hidden="true">◆</span>
+        <span class="mark__word">codeforge</span>
+      </div>
+      <p class="tagline">one thing at a time — pick a mode, describe it, run it.</p>
+    </header>
+
+    <form class="panel" method="POST" id="forgeForm">
+
+      <fieldset class="control-group">
+        <legend class="control-group__label">1. What do you need?</legend>
+        <div class="chips" role="radiogroup" aria-label="Mode">
+          <input type="radio" id="mode-generate" name="mode" value="Generate" {% if mode == 'Generate' %}checked{% endif %}>
+          <label for="mode-generate" class="chip chip--generate">Generate</label>
+
+          <input type="radio" id="mode-debug" name="mode" value="Debug" {% if mode == 'Debug' %}checked{% endif %}>
+          <label for="mode-debug" class="chip chip--debug">Debug</label>
+
+          <input type="radio" id="mode-explain" name="mode" value="Explain" {% if mode == 'Explain' %}checked{% endif %}>
+          <label for="mode-explain" class="chip chip--explain">Explain</label>
+        </div>
+        <p class="control-group__hint" id="modeHint"></p>
+      </fieldset>
+
+      <fieldset class="control-group">
+        <legend class="control-group__label">2. Which engine?</legend>
+        <div class="chips chips--engine" role="radiogroup" aria-label="Engine">
+          <input type="radio" id="engine-groq" name="engine" value="groq" {% if engine == 'groq' %}checked{% endif %}>
+          <label for="engine-groq" class="chip chip--engine">Groq</label>
+
+          <input type="radio" id="engine-meta" name="engine" value="meta" {% if engine == 'meta' %}checked{% endif %}>
+          <label for="engine-meta" class="chip chip--engine">Meta Llama</label>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label class="field__label" for="user_input" id="fieldPrompt">describe what to build</label>
+        <textarea
+          id="user_input"
+          name="user_input"
+          class="field__area"
+          placeholder="e.g. a function that flattens a nested list"
+          spellcheck="false"
+          required>{% if request and request.method == 'POST' %}{{ request.form.get('user_input', '') }}{% endif %}</textarea>
+      </div>
+
+      <div class="field__footer">
+        <span class="hint">Ctrl / ⌘ + Enter to run</span>
+        <button type="submit" class="run" id="runBtn">
+          <span id="runBtnLabel">Run</span>
+        </button>
+      </div>
+    </form>
+
+    <section class="panel panel--output {% if not response %}panel--empty{% endif %}" aria-live="polite">
+      <div class="panel__bar">
+        <span class="panel__bar-title">output</span>
+        {% if response %}
+        <button type="button" class="copy" id="copyBtn">Copy</button>
+        {% endif %}
+      </div>
+      {% if response %}
+        <pre class="output"><code id="outputText">{{ response }}</code></pre>
+      {% else %}
+        <div class="empty">
+          <p class="empty__title">Nothing here yet</p>
+          <p class="empty__sub">Pick a mode above, describe your code, and press Run.</p>
+        </div>
+      {% endif %}
+    </section>
+
+  </main>
+
+  <script>
+    const form = document.getElementById('forgeForm');
+    const modeRadios = form.querySelectorAll('input[name="mode"]');
+    const fieldPrompt = document.getElementById('fieldPrompt');
+    const modeHint = document.getElementById('modeHint');
+    const textarea = document.getElementById('user_input');
+    const runBtn = document.getElementById('runBtn');
+    const runBtnLabel = document.getElementById('runBtnLabel');
+
+    const copy = {
+      Generate: { prompt: 'describe what to build', hint: 'Tell it what you want and it writes the code.', placeholder: 'e.g. a function that flattens a nested list' },
+      Debug:    { prompt: 'paste the code and the error', hint: 'Short answer: what broke, and the fix.', placeholder: 'e.g. TypeError: NoneType is not iterable ...' },
+      Explain:  { prompt: 'paste the code to walk through', hint: 'Plain-language, step-by-step breakdown.', placeholder: 'e.g. explain this recursive quicksort' }
+    };
+
+    function applyMode(value) {
+      document.body.setAttribute('data-mode', value);
+      fieldPrompt.textContent = copy[value].prompt;
+      modeHint.textContent = copy[value].hint;
+      textarea.placeholder = copy[value].placeholder;
+    }
+
+    modeRadios.forEach(r => r.addEventListener('change', () => applyMode(r.value)));
+    applyMode(document.body.getAttribute('data-mode') || 'Generate');
+
+    textarea.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') form.submit();
+    });
+
+    // Immediate, unambiguous feedback on submit — no wondering if the click registered.
+    form.addEventListener('submit', () => {
+      runBtn.disabled = true;
+      runBtnLabel.textContent = 'Working…';
+    });
+
+    const copyBtn = document.getElementById('copyBtn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        const text = document.getElementById('outputText').innerText;
+        navigator.clipboard.writeText(text).then(() => {
+          copyBtn.textContent = 'Copied';
+          setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
